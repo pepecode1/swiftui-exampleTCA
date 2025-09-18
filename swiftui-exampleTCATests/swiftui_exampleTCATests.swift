@@ -12,35 +12,48 @@ import XCTest
 @MainActor
 final class CounterFeatureTests: XCTestCase {
     func testCounterBasics() async {
+        // Crear un TestScheduler para controlar el tiempo
+        let mainQueue = DispatchQueue.test
+        
         // Crear el TestStore con el estado inicial y el reducer
         let store = TestStore(initialState: CounterFeature.State()) {
             CounterFeature()
+        } withDependencies: {
+            $0.mainQueue = mainQueue.eraseToAnyScheduler()
         }
         
-        // Verificar el estado inicial
+        // Verificar estado inicial
         XCTAssertEqual(store.state.count, 0, "El contador inicial debe ser 0")
+        XCTAssertEqual(store.state.history, [], "El historial inicial debe estar vacío")
         
-        // Probar el incremento
+        // Probar incremento
         await store.send(.incrementButtonTapped)
+        await mainQueue.advance(by: .seconds(1)) // Avanzar el tiempo 1 segundo
         await store.receive(.delayedIncrement) {
             $0.count = 1
+            $0.history = [1]
         }
         
-        // Probar un segundo incremento
+        // Probar otro incremento
         await store.send(.incrementButtonTapped)
+        await mainQueue.advance(by: .seconds(1)) // Avanzar el tiempo 1 segundo
         await store.receive(.delayedIncrement) {
             $0.count = 2
+            $0.history = [1, 2]
         }
         
-        // Probar el decremento
+        // Probar decremento
         await store.send(.decrementButtonTapped) {
             $0.count = 1
+            $0.history = [1, 2, 1]
         }
         
-        // Probar volver al estado inicial
-        await store.send(.decrementButtonTapped) {
+        // Probar reinicio
+        await store.send(.resetButtonTapped) {
             $0.count = 0
+            $0.history = [1, 2, 1, 0]
         }
+
     }
     
     func testCounterNegativeValues() async {
@@ -52,17 +65,26 @@ final class CounterFeatureTests: XCTestCase {
         // Decrementar desde 0
         await store.send(.decrementButtonTapped) {
             $0.count = -1
+            $0.history = [-1]
         }
         
         // Decrementar nuevamente
         await store.send(.decrementButtonTapped) {
             $0.count = -2
+            $0.history = [-1, -2]
         }
         
         // Incrementar para volver a -1
         await store.send(.incrementButtonTapped)
         await store.receive(.delayedIncrement) {
             $0.count = -1
+            $0.history = [-1, -2, -1]
+        }
+        
+        // Reiniciar
+        await store.send(.resetButtonTapped) {
+            $0.count = 0
+            $0.history = [-1, -2, -1, 0]
         }
     }
     
@@ -74,6 +96,29 @@ final class CounterFeatureTests: XCTestCase {
         await store.send(.incrementButtonTapped)
         await store.receive(.delayedIncrement) {
             $0.count = 1
+            $0.history = [1]
+        }
+    }
+    
+    func testCounterLimits() async {
+        let store = TestStore(initialState: CounterFeature.State(count: 99)) {
+            CounterFeature()
+        }
+        
+        // Incrementar hasta el límite
+        await store.send(.incrementButtonTapped)
+        await store.receive(.delayedIncrement) {
+            $0.count = 100
+            $0.history = [100]
+        }
+        
+        // Intentar incrementar más allá del límite (no debería cambiar)
+        await store.send(.incrementButtonTapped)
+        
+        // Decrementar
+        await store.send(.decrementButtonTapped) {
+            $0.count = 99
+            $0.history = [100, 99]
         }
     }
 }
