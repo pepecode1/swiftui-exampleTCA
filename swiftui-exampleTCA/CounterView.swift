@@ -16,6 +16,12 @@ struct CounterView: View {
                 Text("Count: \(viewStore.count)")
                     .font(.title)
                 
+                if let result = viewStore.calculationResult {
+                    Text("Calculation Result: \(result)")
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                }
+                
                 if viewStore.count >= viewStore.maxCount {
                     Text("Límite máximo alcanzado (\(viewStore.maxCount))")
                         .foregroundColor(.red)
@@ -49,6 +55,15 @@ struct CounterView: View {
                     .font(.title)
                     .padding()
                     .background(Color.blue)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    
+                    Button("Calculate") {
+                        viewStore.send(.calculateButtonTapped)
+                    }
+                    .font(.title)
+                    .padding()
+                    .background(Color.orange)
                     .foregroundColor(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }

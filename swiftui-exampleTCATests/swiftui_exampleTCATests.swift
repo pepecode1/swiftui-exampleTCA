@@ -25,6 +25,7 @@ final class CounterFeatureTests: XCTestCase {
         // Verificar estado inicial
         XCTAssertEqual(store.state.count, 0, "El contador inicial debe ser 0")
         XCTAssertEqual(store.state.history, [], "El historial inicial debe estar vacío")
+        XCTAssertNil(store.state.calculationResult, "El resultado inicial debe ser nulo")
         
         // Probar incremento
         await store.send(.incrementButtonTapped)
@@ -119,6 +120,31 @@ final class CounterFeatureTests: XCTestCase {
         await store.send(.decrementButtonTapped) {
             $0.count = 99
             $0.history = [100, 99]
+        }
+    }
+    
+    func testCalculation() async {
+        let mainQueue = DispatchQueue.test
+        
+        let store = TestStore(initialState: CounterFeature.State(count: 5)) {
+            CounterFeature()
+        } withDependencies: {
+            $0.mainQueue = mainQueue.eraseToAnyScheduler()
+        }
+        
+        // Probar cálculo
+        await store.send(.calculateButtonTapped)
+        await mainQueue.advance() // Avanzar el scheduler para ejecutar DispatchQueue.global y DispatchQueue.main
+        await store.receive(.calculationCompleted(25)) {
+            $0.calculationResult = 25
+            $0.history = [25]
+        }
+        
+        // Probar reinicio después del cálculo
+        await store.send(.resetButtonTapped) {
+            $0.count = 0
+            $0.history = [25, 0]
+            $0.calculationResult = nil
         }
     }
 }
